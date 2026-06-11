@@ -21,10 +21,10 @@ def render(df: pd.DataFrame, emp_raw: pd.DataFrame):
 
     c1, c2, c3, c4, c5 = st.columns(5)
     for col, label, val, sub in [
-        (c1, "Sucursales",        f"{total_suc}",         "en total"),
-        (c2, "Empleados Activos", f"{emp_activos:,}",     f"de {total_emp:,} totales"),
-        (c3, "Créditos",          f"{total_cred:,}",      "registros"),
-        (c4, "Cartera Total",     fmt_currency(total_cart),"monto pendiente"),
+        (c1, "Sucursales",        f"{total_suc}",          "en total"),
+        (c2, "Empleados Activos", f"{emp_activos:,}",      f"de {total_emp:,} totales"),
+        (c3, "Créditos",          f"{total_cred:,}",       "registros"),
+        (c4, "Cartera Total",     fmt_currency(total_cart), "monto pendiente"),
         (c5, "Monto Atrasado",    fmt_currency(total_atr),
          f"{(total_atr/total_cart*100):.1f}% de cartera" if total_cart else "—"),
     ]:
@@ -33,7 +33,7 @@ def render(df: pd.DataFrame, emp_raw: pd.DataFrame):
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # ── Créditos por sucursal mes a mes — paleta de sucursales ────────────────
+    # ── Créditos por sucursal mes a mes ───────────────────────────────────────
     st.markdown(section_title("Créditos por Sucursal — Mes a Mes"), unsafe_allow_html=True)
 
     top_n = st.slider("Número de sucursales a mostrar", 5, 25, 10, key="top_n_suc")
@@ -59,16 +59,19 @@ def render(df: pd.DataFrame, emp_raw: pd.DataFrame):
     )
     st.plotly_chart(fig_suc, use_container_width=True)
 
-    # ── % mora por sucursal — semáforo rojo/amarillo/verde ────────────────────
+    # ── % mora por sucursal ───────────────────────────────────────────────────
     st.markdown(section_title("% Mora por Sucursal — Monto Atrasado / Monto Colocado"), unsafe_allow_html=True)
 
     mora_suc = (
         df.groupby("sucursal", as_index=False)
-        .agg(monto_colocado=("monto_prestamo","sum"),
-             monto_atr=("monto_atrasado","sum"),
-             creditos=("prestamo","count"))
+        .agg(
+            monto_colocado=("monto_prestamo", "sum"),
+            monto_atr     =("monto_atrasado",  "sum"),
+            creditos       =("prestamo",        "count"),
+        )
         .assign(pct_mora=lambda d: (d["monto_atr"] / d["monto_colocado"] * 100).round(2))
-        .nlargest(20,"pct_mora").sort_values("pct_mora")
+        .nlargest(20, "pct_mora")
+        .sort_values("pct_mora")
     )
     fig_mora = px.bar(
         mora_suc, x="pct_mora", y="sucursal", orientation="h",
@@ -88,32 +91,56 @@ def render(df: pd.DataFrame, emp_raw: pd.DataFrame):
         ),
     )
     apply_theme(fig_mora, "Top 20 Sucursales con Mayor % de Mora")
-    fig_mora.update_layout(height=560, coloraxis_showscale=False,
-                           xaxis_title="% de Mora", yaxis_title="")
+    fig_mora.update_layout(
+        height=560, coloraxis_showscale=False,
+        xaxis_title="% de Mora", yaxis_title="",
+    )
     st.plotly_chart(fig_mora, use_container_width=True)
 
     # ── Ranking tabla ─────────────────────────────────────────────────────────
     st.markdown(section_title("Ranking de Sucursales"), unsafe_allow_html=True)
 
-    ranking = (
+    # Construir ranking con nombres de columna en minúsculas (sin renombrar aún)
+    ranking_raw = (
         df.groupby(["sucursal","region","subdireccion"], as_index=False)
-        .agg(creditos=("prestamo","count"), cartera=("monto_pendiente","sum"),
-             monto_colocado=("monto_prestamo","sum"), monto_atr=("monto_atrasado","sum"),
-             prom_semanal=("pago_semanal","mean"), prom_dias=("dias_atraso","mean"))
+        .agg(
+            creditos      =("prestamo",        "count"),
+            cartera       =("monto_pendiente", "sum"),
+            monto_colocado=("monto_prestamo",  "sum"),
+            monto_atr     =("monto_atrasado",  "sum"),
+            prom_semanal  =("pago_semanal",    "mean"),
+            prom_dias     =("dias_atraso",     "mean"),
+        )
         .assign(pct_mora=lambda d: (d["monto_atr"] / d["monto_colocado"] * 100).round(1))
     )
-    col_sort = st.selectbox("Ordenar por",
-        ["Cartera","Créditos","% Mora","Monto Colocado"], key="rank_sort")
-    sort_map = {"Cartera":"cartera","Créditos":"creditos",
-                "% Mora":"pct_mora","Monto Colocado":"monto_colocado"}
-    ranking = ranking.sort_values(sort_map[col_sort], ascending=False).reset_index(drop=True)
-    ranking.index = ranking.index + 1
 
-    display = ranking.rename(columns={
-        "sucursal":"Sucursal","region":"Región","subdireccion":"Dirección",
-        "creditos":"Créditos","cartera":"Cartera","monto_colocado":"Monto Colocado",
-        "monto_atr":"Monto Atrasado","prom_semanal":"Prom. Pago Semanal",
-        "prom_dias":"Prom. Días Atraso","pct_mora":"% Mora",
+    col_sort = st.selectbox(
+        "Ordenar por",
+        ["cartera","creditos","pct_mora","monto_colocado"],
+        format_func=lambda x: {
+            "cartera":"Cartera","creditos":"Créditos",
+            "pct_mora":"% Mora","monto_colocado":"Monto Colocado"
+        }[x],
+        key="rank_sort",
+    )
+    ranking_raw = ranking_raw.sort_values(col_sort, ascending=False).reset_index(drop=True)
+    ranking_raw.index = ranking_raw.index + 1
+
+    # Guardar para scatter ANTES de renombrar
+    scatter_df = ranking_raw[["sucursal","cartera","pct_mora","creditos","subdireccion"]].copy()
+
+    # Renombrar solo para display
+    display = ranking_raw.rename(columns={
+        "sucursal":       "Sucursal",
+        "region":         "Región",
+        "subdireccion":   "Dirección",
+        "creditos":       "Créditos",
+        "cartera":        "Cartera",
+        "monto_colocado": "Monto Colocado",
+        "monto_atr":      "Monto Atrasado",
+        "prom_semanal":   "Prom. Pago Semanal",
+        "prom_dias":      "Prom. Días Atraso",
+        "pct_mora":       "% Mora",
     })[["Sucursal","Dirección","Región","Créditos","Cartera",
         "Monto Colocado","Monto Atrasado","% Mora","Prom. Días Atraso"]]
 
@@ -131,25 +158,30 @@ def render(df: pd.DataFrame, emp_raw: pd.DataFrame):
         use_container_width=True, height=420,
     )
 
-    # ── Scatter cartera vs mora — color por dirección ─────────────────────────
+    # ── Scatter cartera vs mora — usa scatter_df con nombres originales ────────
     st.markdown(section_title("Dispersión — Cartera vs % Mora por Sucursal"), unsafe_allow_html=True)
-
-    scatter_df = ranking.rename(columns={
-        "Sucursal":"sucursal","Cartera":"cartera",
-        "% Mora":"pct_mora","Créditos":"creditos","Dirección":"direccion",
-    })[["sucursal","cartera","pct_mora","creditos","direccion"]].copy()
 
     fig_sc = px.scatter(
         scatter_df,
-        x="cartera", y="pct_mora",
-        size="creditos", color="direccion",
+        x="cartera",
+        y="pct_mora",
+        size="creditos",
+        color="subdireccion",
         color_discrete_sequence=PALETTE_DIRECCIONES,
         hover_name="sucursal",
-        labels={"cartera":"Cartera Total ($)","pct_mora":"% de Mora",
-                "creditos":"Créditos","direccion":"Dirección"},
+        labels={
+            "cartera":      "Cartera Total ($)",
+            "pct_mora":     "% de Mora",
+            "creditos":     "Créditos",
+            "subdireccion": "Dirección",
+        },
         size_max=45,
     )
     apply_theme(fig_sc, "Cartera Total vs % Mora — tamaño = número de créditos")
-    fig_sc.update_layout(height=440, xaxis_title="Cartera Total ($)",
-                         yaxis_title="% de Mora", legend_title_text="Dirección")
+    fig_sc.update_layout(
+        height=440,
+        xaxis_title="Cartera Total ($)",
+        yaxis_title="% de Mora",
+        legend_title_text="Dirección",
+    )
     st.plotly_chart(fig_sc, use_container_width=True)

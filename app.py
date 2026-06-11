@@ -123,8 +123,8 @@ st.markdown(
 # ── Pills navigation ─────────────────────────────────────────────────────────
 pill = st.pills(
     label="",
-    options=["📊  General", "🗺️  Geográfica", "🏢  Sucursales & Empleados"],
-    default="📊  General",
+    options=["General", "Geográfica", "Sucursales & Empleados"],
+    default="General",
     key="main_pill",
 )
 
@@ -157,11 +157,11 @@ st.markdown("""
 st.markdown("<div style='margin-top:8px'>", unsafe_allow_html=True)
 
 # ── Render ───────────────────────────────────────────────────────────────────
-if pill == "📊  General":
+if pill == "General":
     general.render(df)
-elif pill == "🗺️  Geográfica":
+elif pill == "Geográfica":
     geografica.render(df)
-elif pill == "🏢  Sucursales & Empleados":
+elif pill == "Sucursales & Empleados":
     sucursales.render(df, emp_raw)
 
 st.markdown("</div>", unsafe_allow_html=True)
