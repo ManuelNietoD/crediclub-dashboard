@@ -1,34 +1,42 @@
-# CrediClub brand colors & shared Plotly layout
+PRIMARY     = "#00c4cc"
+PRIMARY_20  = "rgba(0,196,204,0.18)"
+PRIMARY_40  = "rgba(0,196,204,0.40)"
+BG_DARK     = "#0d0d0d"
+BG_CARD     = "rgba(255,255,255,0.04)"
+BORDER      = "rgba(0,196,204,0.25)"
+TEXT_MAIN   = "#f0f0f0"
+TEXT_MUTED  = "#888888"
+WHITE       = "#ffffff"
 
-PRIMARY    = "#00c4cc"   # turquoise accent
-PRIMARY_20 = "rgba(0,196,204,0.18)"
-PRIMARY_40 = "rgba(0,196,204,0.40)"
-BG_DARK    = "#0d0d0d"
-BG_CARD    = "rgba(255,255,255,0.04)"
-BORDER     = "rgba(0,196,204,0.25)"
-TEXT_MAIN  = "#f0f0f0"
-TEXT_MUTED = "#888888"
-WHITE      = "#ffffff"
-
-SEQUENTIAL = [
-    "rgba(0,196,204,0.15)",
-    "rgba(0,196,204,0.35)",
-    "rgba(0,196,204,0.55)",
-    "rgba(0,196,204,0.75)",
-    PRIMARY,
+# ── Paleta de 30 colores distinguibles para gráficas con muchos elementos ──
+# Agrupa tonos: turquesas, azules, verdes, violetas, naranjas, rosas — todos
+# con suficiente contraste sobre fondo oscuro pero sin saturación excesiva.
+PALETTE_30 = [
+    # turquesas / cyans
+    "#00c4cc", "#00e0d0", "#00b3d9", "#00d9b3", "#00c4a0",
+    # azules
+    "#4da6ff", "#3385e0", "#1a66cc", "#6699ff", "#80b3ff",
+    # verdes
+    "#66cc88", "#44bb66", "#33aa55", "#88dd99", "#55cc77",
+    # violetas / morados
+    "#aa88ff", "#8866dd", "#cc99ff", "#9966cc", "#bb77ee",
+    # naranjas / ámbar
+    "#ffaa44", "#ff8833", "#ffbb66", "#dd9933", "#ffcc77",
+    # rosas / corales
+    "#ff7799", "#ee5577", "#ff99aa", "#dd6688", "#ffaabb",
 ]
 
-DIVERGING = [
-    PRIMARY,
-    "rgba(0,196,204,0.50)",
-    "rgba(255,255,255,0.10)",
-    "rgba(255,120,80,0.50)",
-    "#ff7850",
+# Subpaletas semánticas (para cuando todos los elementos son del mismo tipo)
+PALETTE_SUCURSALES  = PALETTE_30          # hasta 30 sucursales
+PALETTE_DIRECCIONES = [                   # 7 direcciones — colores bien distintos
+    "#00c4cc", "#4da6ff", "#66cc88",
+    "#aa88ff", "#ffaa44", "#ff7799", "#33aa55",
 ]
-
-BAR_COLORS = [
-    "#00c4cc", "#00e0c0", "#00b4e0", "#00ccaa",
-    "#00aabb", "#009999", "#007788", "#005566",
+PALETTE_REGIONES = [                      # hasta 20 regiones
+    "#00c4cc","#4da6ff","#66cc88","#aa88ff","#ffaa44",
+    "#ff7799","#00e0d0","#3385e0","#44bb66","#8866dd",
+    "#ff8833","#ee5577","#00b3d9","#1a66cc","#33aa55",
+    "#9966cc","#dd9933","#dd6688","#80b3ff","#88dd99",
 ]
 
 BASE_LAYOUT = dict(
@@ -79,10 +87,8 @@ CARD_CSS = f"""
       color: {TEXT_MAIN};
   }}
 
-  /* hide default streamlit header/footer */
   #MainMenu, footer, header {{ visibility: hidden; }}
 
-  /* KPI cards */
   .kpi-card {{
       background: {BG_CARD};
       border: 1px solid {BORDER};
@@ -110,9 +116,8 @@ CARD_CSS = f"""
       margin-top: 4px;
   }}
 
-  /* Section headers */
   .section-title {{
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 600;
       color: {TEXT_MUTED};
       text-transform: uppercase;
@@ -122,23 +127,9 @@ CARD_CSS = f"""
       margin: 24px 0 12px 0;
   }}
 
-  /* Pill container override */
-  div[data-testid="stHorizontalBlock"] button {{
-      border-radius: 99px !important;
-  }}
-
-  /* Sidebar */
   [data-testid="stSidebar"] {{
       background-color: #0a0a0a;
       border-right: 1px solid {BORDER};
-  }}
-  [data-testid="stSidebar"] * {{
-      color: {TEXT_MUTED} !important;
-  }}
-
-  /* Plotly chart background */
-  .js-plotly-plot .plotly {{
-      border-radius: 12px;
   }}
 </style>
 """

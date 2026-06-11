@@ -4,26 +4,25 @@ import plotly.graph_objects as go
 import pandas as pd
 from utils.theme import (
     apply_theme, kpi_card, section_title, fmt_currency,
-    PRIMARY, PRIMARY_40, TEXT_MUTED, BAR_COLORS
+    PRIMARY, TEXT_MUTED, PALETTE_REGIONES, PALETTE_DIRECCIONES,
 )
 
 REGION_COORDS = {
-    "NORTE":              (25.6866, -100.3161),
-    "NOROESTE":           (29.0729, -110.9559),
-    "CENTRO-OCCIDENTE":   (20.6597, -103.3496),
-    "SUR":                (17.9869,  -92.9303),
-    "ARCO - CDMX":        (19.4326,  -99.1332),
-    "CENTRO":             (19.0414,  -98.2063),
-    "PACIFICO":           (20.9674, -105.2664),
-    "ALTRECA":            (23.6345, -102.5528),
-    "AVANZA":             (21.0,    -101.0),
+    "NORTE":            (25.6866, -100.3161),
+    "NOROESTE":         (29.0729, -110.9559),
+    "CENTRO-OCCIDENTE": (20.6597, -103.3496),
+    "SUR":              (17.9869,  -92.9303),
+    "ARCO - CDMX":      (19.4326,  -99.1332),
+    "CENTRO":           (19.0414,  -98.2063),
+    "PACIFICO":         (20.9674, -105.2664),
+    "ALTRECA":          (23.6345, -102.5528),
+    "AVANZA":           (21.0,    -101.0),
 }
 
 
 def render(df: pd.DataFrame):
-    # ── KPIs por dirección ───────────────────────────────────────────────────
+    # ── KPIs por dirección — cada dirección su color ──────────────────────────
     st.markdown(section_title("Cartera por Dirección"), unsafe_allow_html=True)
-
     dir_summary = (
         df.groupby("subdireccion", as_index=False)
         .agg(cartera=("monto_pendiente","sum"), creditos=("prestamo","count"))
@@ -32,26 +31,19 @@ def render(df: pd.DataFrame):
     cols = st.columns(len(dir_summary))
     for col, (_, row) in zip(cols, dir_summary.iterrows()):
         with col:
-            st.markdown(
-                kpi_card(row["subdireccion"], fmt_currency(row["cartera"]), f"{row['creditos']:,} créditos"),
-                unsafe_allow_html=True,
-            )
+            st.markdown(kpi_card(row["subdireccion"], fmt_currency(row["cartera"]),
+                                 f"{row['creditos']:,} créditos"), unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # ── Heatmap Región × Mes ─────────────────────────────────────────────────
+    # ── Heatmap Región × Mes — escala continua del brand ──────────────────────
     st.markdown(section_title("Monto Préstamo por Región y Mes"), unsafe_allow_html=True)
-
     pivot = (
         df.groupby(["region","mes_orden","mes_nombre"], as_index=False)
-        .agg(monto=("monto_prestamo","sum"))
-        .sort_values("mes_orden")
+        .agg(monto=("monto_prestamo","sum")).sort_values("mes_orden")
     )
-    mes_labels = (
-        pivot.sort_values("mes_orden")[["mes_orden","mes_nombre"]]
-        .drop_duplicates()
-        .set_index("mes_orden")["mes_nombre"]
-    )
+    mes_labels = (pivot.sort_values("mes_orden")[["mes_orden","mes_nombre"]]
+                  .drop_duplicates().set_index("mes_orden")["mes_nombre"])
     pivot_wide = pivot.pivot_table(
         index="region", columns="mes_nombre", values="monto", aggfunc="sum", fill_value=0
     )
@@ -62,7 +54,7 @@ def render(df: pd.DataFrame):
         pivot_wide,
         color_continuous_scale=[[0,"rgba(0,0,0,0)"],[0.3,"rgba(0,196,204,0.3)"],[1,PRIMARY]],
         aspect="auto",
-        labels={"color":"Monto Préstamo ($)", "x":"Mes", "y":"Región"},
+        labels={"color":"Monto ($)","x":"Mes","y":"Región"},
         text_auto=".2s",
     )
     fig_heat.update_traces(
@@ -74,113 +66,126 @@ def render(df: pd.DataFrame):
         height=420,
         xaxis=dict(title="Mes", tickangle=-30, tickfont=dict(color=TEXT_MUTED, size=11)),
         yaxis=dict(title="Región", tickfont=dict(color=TEXT_MUTED, size=11)),
-        coloraxis_colorbar=dict(
-            title=dict(text="Monto ($)", font=dict(color=TEXT_MUTED)),
-            tickfont=dict(color=TEXT_MUTED),
-        ),
+        coloraxis_colorbar=dict(title=dict(text="Monto ($)", font=dict(color=TEXT_MUTED)),
+                                tickfont=dict(color=TEXT_MUTED)),
     )
     st.plotly_chart(fig_heat, use_container_width=True)
 
-    # ── Mapa burbuja ─────────────────────────────────────────────────────────
-    st.markdown(section_title("Mapa — Cartera por Dirección"), unsafe_allow_html=True)
+    # ── Heatmap % Mora por Región × Mes — verde=bueno, rojo=malo ─────────────
+    st.markdown(section_title("% Mora por Región y Mes"), unsafe_allow_html=True)
 
+    mora_pivot = (
+        df.groupby(["region","mes_orden","mes_nombre"], as_index=False)
+        .agg(monto_atr=("monto_atrasado","sum"), monto_pend=("monto_pendiente","sum"))
+        .assign(pct_mora=lambda d: (d["monto_atr"] / d["monto_pend"] * 100).round(1))
+        .sort_values("mes_orden")
+    )
+    mora_wide = mora_pivot.pivot_table(
+        index="region", columns="mes_nombre", values="pct_mora", aggfunc="mean", fill_value=0
+    )
+    mora_wide = mora_wide[[c for c in ordered_cols if c in mora_wide.columns]]
+
+    fig_mora_heat = px.imshow(
+        mora_wide,
+        color_continuous_scale=[
+            [0.0, "#1a6e3c"],   # verde oscuro — mora muy baja
+            [0.2, "#2ecc71"],   # verde brillante
+            [0.4, "#f9e04b"],   # amarillo
+            [0.7, "#e67e22"],   # naranja
+            [1.0, "#c0392b"],   # rojo oscuro — mora muy alta
+        ],
+        aspect="auto",
+        labels={"color":"% Mora","x":"Mes","y":"Región"},
+        text_auto=".1f",
+        zmin=0,
+        zmax=mora_wide.values.max() if mora_wide.values.max() > 0 else 10,
+    )
+    fig_mora_heat.update_traces(
+        textfont=dict(color="white", size=10),
+        hovertemplate="<b>Región:</b> %{y}<br><b>Mes:</b> %{x}<br><b>% Mora:</b> %{z:.1f}%<extra></extra>",
+    )
+    apply_theme(fig_mora_heat, "% de Mora por Región y Mes  —  🟢 Bueno · 🟡 Medio · 🔴 Alto")
+    fig_mora_heat.update_layout(
+        height=420,
+        xaxis=dict(title="Mes", tickangle=-30, tickfont=dict(color=TEXT_MUTED, size=11)),
+        yaxis=dict(title="Región", tickfont=dict(color=TEXT_MUTED, size=11)),
+        coloraxis_colorbar=dict(
+            title=dict(text="% Mora", font=dict(color=TEXT_MUTED)),
+            tickfont=dict(color=TEXT_MUTED),
+            ticksuffix="%",
+        ),
+    )
+    st.plotly_chart(fig_mora_heat, use_container_width=True)
+
+    # ── Mapa burbuja — color por % mora (semáforo), tamaño = cartera ──────────
+    st.markdown(section_title("Mapa — Cartera por Dirección"), unsafe_allow_html=True)
     map_df = (
         df.groupby("subdireccion", as_index=False)
-        .agg(
-            cartera  =("monto_pendiente","sum"),
-            creditos =("prestamo",       "count"),
-            monto_atr=("monto_atrasado", "sum"),
-        )
+        .agg(cartera=("monto_pendiente","sum"), creditos=("prestamo","count"),
+             monto_atr=("monto_atrasado","sum"))
     )
     map_df["lat"]      = map_df["subdireccion"].map(lambda x: REGION_COORDS.get(x,(23.6,-102.5))[0])
     map_df["lon"]      = map_df["subdireccion"].map(lambda x: REGION_COORDS.get(x,(23.6,-102.5))[1])
     map_df["pct_mora"] = (map_df["monto_atr"] / map_df["cartera"] * 100).round(1)
 
     fig_map = px.scatter_mapbox(
-        map_df,
-        lat="lat", lon="lon",
-        size="cartera",
-        color="pct_mora",
+        map_df, lat="lat", lon="lon",
+        size="cartera", color="pct_mora",
         color_continuous_scale=[[0,PRIMARY],[0.5,"rgba(255,200,80,0.8)"],[1,"#ff7850"]],
-        size_max=70,
-        hover_name="subdireccion",
-        hover_data={
-            "cartera":  ":.0f",
-            "creditos": True,
-            "pct_mora": ":.1f",
-            "lat": False, "lon": False,
-        },
+        size_max=70, hover_name="subdireccion",
+        hover_data={"cartera":":.0f","creditos":True,"pct_mora":":.1f","lat":False,"lon":False},
         labels={"pct_mora":"% Mora","cartera":"Cartera ($)","creditos":"Créditos"},
         mapbox_style="carto-darkmatter",
-        center={"lat":23.6,"lon":-102.5},
-        zoom=4.2,
+        center={"lat":23.6,"lon":-102.5}, zoom=4.2,
     )
     fig_map.update_layout(
-        paper_bgcolor="rgba(0,0,0,0)",
-        height=500,
-        margin=dict(l=0,r=0,t=0,b=0),
-        coloraxis_colorbar=dict(
-            title=dict(text="% Mora", font=dict(color=TEXT_MUTED)),
-            tickfont=dict(color=TEXT_MUTED),
-        ),
+        paper_bgcolor="rgba(0,0,0,0)", height=500, margin=dict(l=0,r=0,t=0,b=0),
+        coloraxis_colorbar=dict(title=dict(text="% Mora", font=dict(color=TEXT_MUTED)),
+                                tickfont=dict(color=TEXT_MUTED)),
     )
     st.plotly_chart(fig_map, use_container_width=True)
-    st.caption("🟢 Verde = mora baja · 🟡 Amarillo = mora media · 🔴 Rojo = mora alta  |  Tamaño de burbuja = cartera total")
+    st.caption("🟢 Verde = mora baja · 🟡 Amarillo = mora media · 🔴 Rojo = mora alta  |  Tamaño = cartera total")
 
-    # ── Pago semanal promedio por dirección ──────────────────────────────────
+    # ── Pago semanal por dirección — cada dirección su color ──────────────────
     st.markdown(section_title("Pago Semanal Promedio por Dirección"), unsafe_allow_html=True)
-
     pago_dir = (
         df.groupby("subdireccion", as_index=False)
         .agg(prom_semanal=("pago_semanal","mean"))
         .sort_values("prom_semanal")
     )
     fig_semanal = px.bar(
-        pago_dir, x="prom_semanal", y="subdireccion",
-        orientation="h",
-        color="prom_semanal",
-        color_continuous_scale=[[0,"rgba(0,196,204,0.2)"],[1,PRIMARY]],
+        pago_dir, x="prom_semanal", y="subdireccion", orientation="h",
+        color="subdireccion",
+        color_discrete_sequence=PALETTE_DIRECCIONES,
         labels={"prom_semanal":"Pago Semanal Promedio ($)","subdireccion":"Dirección"},
         text=pago_dir["prom_semanal"].apply(fmt_currency),
     )
     fig_semanal.update_traces(
-        textposition="outside",
-        textfont=dict(color=TEXT_MUTED, size=11),
+        textposition="outside", textfont=dict(color=TEXT_MUTED, size=11),
         hovertemplate="<b>%{y}</b><br>Pago Semanal Promedio: $%{x:,.0f}<extra></extra>",
     )
     apply_theme(fig_semanal, "Promedio de Pago Semanal por Dirección")
-    fig_semanal.update_layout(
-        height=340,
-        coloraxis_showscale=False,
-        xaxis_title="Pago Semanal Promedio ($)",
-        yaxis_title="Dirección",
-    )
+    fig_semanal.update_layout(height=340, showlegend=False,
+                              xaxis_title="Pago Semanal Promedio ($)", yaxis_title="")
     st.plotly_chart(fig_semanal, use_container_width=True)
 
-    # ── Treemap ──────────────────────────────────────────────────────────────
+    # ── Treemap — Dirección → Región → Sucursal ────────────────────────────────
     st.markdown(section_title("Distribución de Cartera — Dirección · Región · Sucursal"), unsafe_allow_html=True)
-
     tree_df = (
         df.groupby(["subdireccion","region","sucursal"], as_index=False)
         .agg(cartera=("monto_pendiente","sum"))
     )
     fig_tree = px.treemap(
-        tree_df,
-        path=["subdireccion","region","sucursal"],
-        values="cartera",
-        color="cartera",
-        color_continuous_scale=[[0,"rgba(0,196,204,0.2)"],[0.5,"rgba(0,196,204,0.6)"],[1,PRIMARY]],
-        labels={"cartera":"Cartera ($)"},
+        tree_df, path=["subdireccion","region","sucursal"], values="cartera",
+        color="subdireccion",
+        color_discrete_sequence=PALETTE_DIRECCIONES,
+        labels={"cartera":"Cartera ($)","subdireccion":"Dirección"},
     )
     fig_tree.update_traces(
         textfont=dict(color="white"),
         hovertemplate="<b>%{label}</b><br>Cartera: $%{value:,.0f}<extra></extra>",
     )
     apply_theme(fig_tree, "Distribución de Cartera por Dirección / Región / Sucursal")
-    fig_tree.update_layout(
-        height=500,
-        coloraxis_showscale=False,
-        paper_bgcolor="rgba(0,0,0,0)",
-        margin=dict(l=0,r=0,t=40,b=0),
-    )
+    fig_tree.update_layout(height=500, showlegend=False,
+                           paper_bgcolor="rgba(0,0,0,0)", margin=dict(l=0,r=0,t=40,b=0))
     st.plotly_chart(fig_tree, use_container_width=True)
