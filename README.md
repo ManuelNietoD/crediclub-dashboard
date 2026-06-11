@@ -2,7 +2,7 @@
 
 Dashboard interactivo de crédito construido con **Streamlit + Plotly**.
 
-## 🗂️ Estructura
+## Estructura
 
 ```
 crediclub-dashboard/
@@ -23,25 +23,7 @@ crediclub-dashboard/
 └── requirements.txt
 ```
 
-## 🚀 Correr localmente
-
-```bash
-pip install -r requirements.txt
-streamlit run app.py
-```
-
-## ☁️ Deploy en Streamlit Community Cloud (gratis)
-
-1. Sube este repositorio a **GitHub** (puede ser privado)
-2. Ve a [share.streamlit.io](https://share.streamlit.io) e inicia sesión con tu cuenta de GitHub
-3. Clic en **"New app"**
-4. Selecciona el repo, la rama (`main`) y el archivo principal (`app.py`)
-5. Clic en **"Deploy"** — listo en ~2 minutos ✅
-
-La URL pública quedará algo como:
-`https://tu-usuario-crediclub-dashboard-app-xxxx.streamlit.app`
-
-## 📊 Métricas implementadas (Ejercicio 2)
+## Métricas implementadas (Ejercicio 2)
 
 | Métrica | Pill | Visualización |
 |---|---|---|
